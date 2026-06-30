@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "Si utilizas este código en tu investigación, por favor citarlo como:"
-title: "El título de tu tesis o repositorio"
+title: "Aplicación de datos satelitales para la validación Top-Down/Bottom-Up de las emisiones superficiales de NOx generadas por el sector transporte en Chile (2018-2025). Descarga de datos satelitales Sentinel 5-p."
 authors:
-  - family-names: "Tu Apellido"
-    given-names: "Tu Nombre"
+  - family-names: "Pereira Cofré"
+    given-names: "Marcos"
 version: "1.0.0"
-date-released: "YYYY-MM-DD"
+date-released: "2026-06-30"
