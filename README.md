@@ -18,7 +18,8 @@ Este pipeline automatizado se puede explicar en 4 fases lógicas:
 
 ## Fase 4: Descarga Temporal y Recorte Estructural (procesar_orbita y recortar_nc)
 - Baja el archivo crudo (~500 MB) en fragmentos (chunk_size=8192) a un archivo temporal.
-- Encuentra los índices exactos del BBOX. Luego, en lugar de arruinar el archivo NetCDF original, abre meticulosamente los 4 grupos exigidos por el modelo CHIMERE (PRODUCT, GEOLOCATIONS, INPUT_DATA, DETAILED_RESULTS), los recorta espacialmente y los reensambla en un nuevo NetCDF de apenas unos pocos Megabytes (mode='a'). Finalmente, borra el archivo crudo original.
+- Encuentra los índices exactos del BBOX. Luego, en lugar de arruinar el archivo NetCDF original, abre meticulosamente los 4 grupos exigidos por el modelo CHIMERE (PRODUCT, GEOLOCATIONS, INPUT_DATA, DETAILED_RESULTS), los recorta espacialmente y los reensambla en un nuevo NetCDF de apenas unos pocos Megabytes (mode='a').
+- Finalmente, borra el archivo crudo original.
 
 ## Diagrama del proceso de descarga
 ```mermaid
