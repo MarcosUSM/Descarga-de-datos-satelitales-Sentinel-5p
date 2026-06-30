@@ -1,62 +1,6 @@
 # Descarga de datos satelitales Sentinel-5p
 Proceso optimizado de descarga de datos satelitales, enfocado en la columna troposférica de NO2 de Sentinel-5p de Coernicus (ESA). Este trabajo ha sido posible gracias al proyecto FONDECYT N°1241477.
 
-flowchart TD
-    %% Definición de Estilos
-    classDef inicio_fin fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff,font-weight:bold;
-    classDef proceso fill:#ecf0f1,stroke:#bdc3c7,stroke-width:2px,color:#2c3e50;
-    classDef decision fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff;
-    classDef espacial fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
-    classDef archivo fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff;
-
-    %% DECLARACIÓN DE NODOS (Formas y Textos)
-    A(["Inicio: Definir Fechas y BBOX Chile Central"])
-    B{"¿Día dentro <br/>del rango?"}
-    C["Gestión de Token: API Copernicus"]
-    D["Consulta OData OData.CSC.Intersects <br/> Tolerancia a versiones: OFFL o RPRO"]
-    E{"¿Existen <br/>pasadas hoy?"}
-    F["Avanzar al día siguiente"]
-    G["Evaluación Geométrica: <br/>Extraer huellas WKT de la API"]
-    H["Calcular área de intersección matemática <br/> Footprint vs BBOX"]
-    I["Ordenar órbitas por mayor cobertura"]
-    J["Seleccionar Órbita Maestra"]
-    K["Descarga temporal en Streaming (chunks)"]
-    L{"¿Archivo > Umbral MB?"}
-    M["Descartar archivo corrupto"]
-    N["Geoprocesamiento en Memoria (xarray)"]
-    O["Enmascaramiento y Extracción de sub-grupos:<br/>- PRODUCT<br/>- GEOLOCATIONS<br/>- INPUT_DATA<br/>- DETAILED_RESULTS"]
-    P[("Guardar NetCDF4 Reducido")]
-    Q["Eliminar NetCDF temporal pesado"]
-    R(["Fin: Base de datos lista para FDA"])
-
-    %% CONEXIONES (Flechas)
-    A --> B
-    B -- Sí --> C
-    C --> D
-    D --> E
-    E -- No --> F
-    F --> B
-    E -- Sí --> G
-    G --> H
-    H --> I
-    I --> J
-    J --> K
-    K --> L
-    L -- No --> M
-    M --> F
-    L -- Sí --> N
-    N --> O
-    O --> P
-    P --> Q
-    Q --> F
-    B -- No --> R
-
-    %% APLICACIÓN DE COLORES
-    class A,R inicio_fin;
-    class C,D,F,K,M,Q proceso;
-    class B,E,L decision;
-    class G,H,I,N,O espacial;
-    class J,P archivo;
 Este pipeline automatizado se puede explicar en 4 fases lógicas:
 
 ## Fase 1: Autenticación Dinámica (get_token)
@@ -75,3 +19,41 @@ Este pipeline automatizado se puede explicar en 4 fases lógicas:
 ## Fase 4: Descarga Temporal y Recorte Estructural (procesar_orbita y recortar_nc)
 - Baja el archivo crudo (~500 MB) en fragmentos (chunk_size=8192) a un archivo temporal.
 - Encuentra los índices exactos del BBOX. Luego, en lugar de arruinar el archivo NetCDF original, abre meticulosamente los 4 grupos exigidos por el modelo CHIMERE (PRODUCT, GEOLOCATIONS, INPUT_DATA, DETAILED_RESULTS), los recorta espacialmente y los reensambla en un nuevo NetCDF de apenas unos pocos Megabytes (mode='a'). Finalmente, borra el archivo crudo original.
+
+## Diagrama del proceso de descarga
+```mermaid
+graph TD
+    %% Definición de Estilos
+    classDef inicio_fin fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef proceso fill:#ecf0f1,stroke:#bdc3c7,stroke-width:2px,color:#2c3e50;
+    classDef decision fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff;
+    classDef espacial fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+    classDef archivo fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff;
+
+    A([Inicio: Definir Fechas y BBOX Chile Central]):::inicio_fin --> B{¿Día dentro <br>del rango?}:::decision
+    
+    B -- Sí --> C[Gestión de Token: API Copernicus]:::proceso
+    C --> D[Consulta OData OData.CSC.Intersects <br> Tolerancia a versiones: OFFL o RPRO]:::proceso
+    
+    D --> E{¿Existen <br>pasadas hoy?}:::decision
+    E -- No --> F[Avanzar al día siguiente]:::proceso --> B
+    
+    E -- Sí --> G[Evaluación Geométrica: <br>Extraer huellas WKT de la API]:::espacial
+    G --> H[Calcular área de intersección matemática <br> Footprint vs BBOX]:::espacial
+    H --> I[Ordenar órbitas por mayor cobertura]:::espacial
+    I --> J[Seleccionar Órbita Maestra]:::archivo
+    
+    J --> K[Descarga temporal en Streaming chunks]:::proceso
+    
+    K --> L{¿Archivo > <br> Umbral MB?}:::decision
+    L -- No --> M[Descartar archivo corrupto]:::proceso --> F
+    
+    L -- Sí --> N[Geoprocesamiento en Memoria xarray]:::espacial
+    N --> O[Enmascaramiento y Extracción de sub-grupos:<br>- PRODUCT<br>- GEOLOCATIONS<br>- INPUT_DATA<br>- DETAILED_RESULTS]:::espacial
+    
+    O --> P[(Guardar NetCDF4 Reducido)]:::archivo
+    P --> Q[Eliminar NetCDF temporal pesado]:::proceso
+    Q --> F
+    
+    B -- No --> R([Fin: Base de datos lista para FDA]):::inicio_fin
+```
