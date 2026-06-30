@@ -23,7 +23,7 @@ Antes de ejecutar el script, es necesario configurar las variables globales ubic
    FECHA_FIN = "2023-12-31"
    ```
 3. **Dominio espacial (Bounding Box):**
-   Ajusta los límites geográficos ([min, max]) para recortar la órbita. Por defecto, está configurado para la zona central de Chile.
+   Ajusta los límites geográficos ([min, max]) para recortar la órbita. Por defecto, está configurado para Chile continental.
    ```python
    LAT_LIMITS = [-56.5, -16.5]
    LON_LIMITS = [-76.5, -65.5]
