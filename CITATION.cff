@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "Si utilizas este código en tu investigación, por favor citarlo como:"
+title: "El título de tu tesis o repositorio"
+authors:
+  - family-names: "Tu Apellido"
+    given-names: "Tu Nombre"
+version: "1.0.0"
+date-released: "YYYY-MM-DD"
