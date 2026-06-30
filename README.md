@@ -1,27 +1,79 @@
-# Descarga de datos satelitales Sentinel-5p
-Proceso optimizado de descarga de datos satelitales, enfocado en la columna troposférica de NO2 de Sentinel-5p de Coernicus (ESA). Este trabajo ha sido posible gracias al proyecto FONDECYT N°1241477.
+# Descarga de datos satelitales Sentinel-5P (TROPOMI)
 
-Este pipeline automatizado se puede explicar en 4 fases lógicas:
+Proceso automatizado y optimizado para la descarga masiva de datos satelitales, enfocado en la columna troposférica de NO₂ del instrumento TROPOMI a bordo de Sentinel-5P (Copernicus, ESA). 
 
-## Fase 1: Autenticación Dinámica (get_token)
+*Este trabajo ha sido desarrollado como parte de una tesis de magíster y ha sido posible gracias al proyecto FONDECYT N°1241477.*
+
+---
+
+## Configuración (Inputs)
+
+Antes de ejecutar el script, es necesario configurar las variables globales ubicadas al inicio del código. Estos son los **inputs** que definen qué, cuándo y dónde se descargará la información:
+
+1. **Credenciales de Copernicus:**
+   Debes estar registrado en el [Copernicus Data Space Ecosystem](https://dataspace.copernicus.eu/).
+   ```python
+   USERNAME = 'tu_correo@ejemplo.com'
+   PASSWORD = 'tu_contraseña'
+   ```
+2. **Rango Temporal:**
+   Define la ventana de tiempo de tu estudio en formato YYYY-MM-DD.
+   ```python
+   FECHA_INICIO = "2023-08-21"
+   FECHA_FIN = "2023-12-31"
+   ```
+3. **Dominio espacial (Bounding Box):**
+   Ajusta los límites geográficos ([min, max]) para recortar la órbita. Por defecto, está configurado para la zona central de Chile.
+   ```python
+   LAT_LIMITS = [-56.5, -16.5]
+   LON_LIMITS = [-76.5, -65.5]
+   ```
+4. **Directorio de salida:**
+   Nombre de la carpeta donde se almacenarán los archivos procesados (se creará automáticamente si no existe).
+   ```python
+   CARPETA_DESTINO = "Input"
+   ```
+
+## Resultados esperados (Outputs)
+El script no descarga las pesadas órbitas crudas de manera definitiva. En su lugar, el pipeline extrae inteligentemente solo los píxeles de interés y genera archivos altamente optimizados.
+
+- **Ubicación**: Todos los archivos se guardarán en el directorio definido en ```CARPETA_DESTINO```.
+- **Nomenclatura**: ```<Nombre_Original_de_la_Orbita>_reduced_chile.nc```
+- **Reducción de tamaño**: Pasan de ser archivos crudos de **~500 MB** a archivos recortados de apenas unos pocos Megabytes.
+- **Estructura Interna**: El archivo NetCDF4 de salida preserva intacta la estricta jerarquía de grupos de la ESA (revisar manual de descarga. Contiene exactamente 4 grupos:
+    - ```/PRODUCT```
+    - ```/PRODUCT/SUPPORT_DATA/GEOLOCATIONS```
+    - ```/PRODUCT/SUPPORT_DATA/INPUT_DATA```
+    - ```/PRODUCT/SUPPORT_DATA/DETAILED_RESULTS```
+
+## Arquitectura del pipeline
+Este flujo de trabajo automatizado resuelve los principales cuellos de botella del manejo de datos satelitales espaciales a través de 4 fases lógicas:
+
+### Fase 1: Autenticación dinámica (```get_token```)
 - La API de Copernicus expira los tokens de acceso cada 10 minutos (600 segundos), provocando caídas en descargas masivas.
 - El script almacena el token de forma global y calcula su tiempo de expiración. Antes de cada solicitud, verifica si el token actual tiene al menos 2 minutos de vida restante. Si es así, lo reutiliza; de lo contrario, solicita uno nuevo. Esto garantiza ejecuciones ininterrumpidas durante días.
 
-## Fase 2: Consulta API y Tolerancia a Versiones (buscar_productos_dia)
-- Se utiliza la API OData de Copernicus mediante un filtro geográfico (OData.CSC.Intersects) y temporal estricto (00:00 a 23:59 UTC).
-- Incorpora la condición (contains(Name,'OFFL') or contains(Name,'RPRO')). Esto hace que, si la Agencia Espacial Europea (ESA) aún no ha reprocesado los datos de un año reciente (2023-2024), descargará la versión Offline (OFFL). Si es un año antiguo (2018-2021), descargará la Reprocessed (RPRO).
+### Fase 2: Consulta API y Tolerancia a Versiones (```buscar_productos_dia```)
+- Se utiliza la API OData de Copernicus mediante un filtro geográfico (```OData.CSC.Intersects```) y temporal estricto (00:00 a 23:59 UTC).
+- Incorpora la condición ```(contains(Name,'OFFL') or contains(Name,'RPRO'))```. Esto hace que, si la Agencia Espacial Europea (ESA) aún no ha reprocesado los datos de un año reciente (2023-2024), descargará la versión Offline (```OFFL```). Si es un año antiguo (2018-2021), descargará la Reprocessed (```RPRO```).
 
-## Fase 3: Inteligencia Espacial y Selección de Órbita Maestra (__main__)
+### Fase 3: Inteligencia Espacial y Selección de Órbita Maestra (```__main__```)
 - Se aíslan las pasadas del satélite correspondientes a las horas de sobrepaso en Chile (bloques T17, T18, T19).
-- TROPOMI suele superponer dos órbitas marginales sobre Chile en un mismo día. Para evitar promediar bordes de órbitas deformados, el script lee el Footprint (huella en WKT) del archivo directamente desde los metadatos de la API, lo convierte a un polígono con la librería shapely y calcula su área de intersección real con la caja de estudio (BBOX). 
-- Ordena los candidatos de mayor a menor cobertura. Descarga la órbita con más superposición y, una vez recortada con éxito, ejecuta un break para ignorar las órbitas marginales del mismo día, ahorrando ancho de banda, tiempo y almacenamiento.
+- TROPOMI suele superponer dos órbitas marginales sobre Chile en un mismo día. Para evitar promediar bordes de órbitas deformados, el script lee el ```Footprint``` (huella en WKT) del archivo directamente desde los metadatos de la API, lo convierte a un polígono con la librería ```shapely``` y calcula su área de intersección real con la caja de estudio (BBOX). 
+- Ordena los candidatos de mayor a menor cobertura. Descarga la órbita con más superposición y, una vez recortada con éxito, ejecuta un ```break``` para ignorar las órbitas marginales del mismo día, ahorrando ancho de banda, tiempo y almacenamiento.
 
-## Fase 4: Descarga Temporal y Recorte Estructural (procesar_orbita y recortar_nc)
-- Baja el archivo crudo (~500 MB) en fragmentos (chunk_size=8192) a un archivo temporal.
-- Encuentra los índices exactos del BBOX. Luego, en lugar de arruinar el archivo NetCDF original, abre meticulosamente los 4 grupos exigidos por el modelo CHIMERE (PRODUCT, GEOLOCATIONS, INPUT_DATA, DETAILED_RESULTS), los recorta espacialmente y los reensambla en un nuevo NetCDF de apenas unos pocos Megabytes (mode='a').
-- Finalmente, borra el archivo crudo original.
+### Fase 4: Descarga Temporal y Recorte Estructural (```procesar_orbita``` y ```recortar_nc```)
+- Baja el archivo crudo (~500 MB) en fragmentos (```chunk_size=8192```) a un archivo temporal.
+- Utilizando ```xarray```, encuentra los índices exactos del BBOX. Luego, en lugar de aplanar el archivo NetCDF original (lo que destruiría los metadatos), abre meticulosamente los 4 sub-grupos exigidos por los modelos atmosféricos, los recorta espacialmente y los reensambla en el nuevo archivo NetCDF de bajo peso (```mode='a'```).
+- Finalmente, elimina de manera automática el archivo crudo temporal para no saturar el disco duro.
 
-## Diagrama del proceso de descarga
+## Dependencias Requeridas
+Asegúrate de instalar las siguientes librerías antes de ejecutar el script:
+```python
+   pip install requests xarray numpy netCDF4 shapely
+```
+
+## Diagrama de flujo del proceso de descarga
 ```mermaid
 graph TD
     %% Definición de Estilos
